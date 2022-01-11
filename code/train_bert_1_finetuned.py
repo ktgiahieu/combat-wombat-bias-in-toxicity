@@ -10,7 +10,7 @@ from torch import nn
 from torch.utils import data
 
 from apex import amp
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from transformers import BertForSequenceClassification, AdamW
 
