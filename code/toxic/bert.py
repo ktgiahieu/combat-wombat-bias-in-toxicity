@@ -1,5 +1,5 @@
 from torch import nn
-from pytorch_pretrained_bert import BertTokenizer, GPT2Tokenizer
+from transformers import BertTokenizer, GPT2Tokenizer
 
 
 UNCASED_TOKENIZER = BertTokenizer.from_pretrained("bert-base-uncased")

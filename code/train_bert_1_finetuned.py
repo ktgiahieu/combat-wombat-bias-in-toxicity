@@ -12,7 +12,7 @@ from torch.utils import data
 from apex import amp
 from tensorboardX import SummaryWriter
 
-from pytorch_pretrained_bert import BertForSequenceClassification, BertAdam
+from transformers import BertForSequenceClassification, AdamW
 
 from toxic.utils import (
     perfect_bias,
@@ -113,7 +113,7 @@ def train_bert(config: PipeLineConfig):
         },
     ]
 
-    optimizer = BertAdam(
+    optimizer = AdamW(
         optimizer_grouped_parameters,
         lr=config.lr,
         warmup=config.warmup,
