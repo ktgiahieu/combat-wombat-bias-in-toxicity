@@ -54,9 +54,9 @@ def convert_line_gpt(text):
 
 def prepare_loss(config: PipeLineConfig):
     def custom_loss(data, targets):
-        bce_loss_1 = nn.BCEWithLogitsLoss(targets[:, 1:2])(data[:, :1], targets[:, :1])
+        bce_loss_1 = nn.BCEWithLogitsLoss(weight=targets[:, 1:2])(data[:, :1], targets[:, :1])
         bce_loss_2 = nn.BCEWithLogitsLoss()(data[:, 1:7], targets[:, 2:8])
-        bce_loss_3 = nn.BCEWithLogitsLoss(targets[:, 19:20])(
+        bce_loss_3 = nn.BCEWithLogitsLoss(weight=targets[:, 19:20])(
             data[:, 7:18], targets[:, 8:19]
         )
         return config.main_loss_weight * bce_loss_1 + bce_loss_2 + bce_loss_3 / 4
