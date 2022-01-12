@@ -194,5 +194,6 @@ if __name__ == "__main__":
         main_loss_weight=0.95,
     )
 
-    for config in (config_1, config_2, config_3):
+    for ci, config in enumerate((config_1, config_2, config_3)):
+        print(f'Training config {ci}')
         train_bert(config)
