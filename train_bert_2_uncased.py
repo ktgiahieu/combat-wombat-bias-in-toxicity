@@ -40,8 +40,8 @@ def train_bert(config: PipeLineConfig):
 
     logging.info("Reading data...")
     input_folder = "../input/jigsaw-unintended-bias-in-toxicity-classification/"
-    train = pd.read_csv(os.path.join(input_folder, "train.csv"))
-    print(f"Dataset size: {len(train}")
+    train = pd.read_csv(os.path.join(input_folder, "train.csv"))[:1000]
+    print(f"Dataset size: {len(train)}")
 
     logging.info("Tokenizing...")
 
