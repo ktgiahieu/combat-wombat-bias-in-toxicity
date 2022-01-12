@@ -5,6 +5,8 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 
+import tqdm
+
 import torch
 from torch import nn
 from torch.utils import data
@@ -137,7 +139,8 @@ def train_bert(config: PipeLineConfig):
     custom_loss = prepare_loss(config)
 
     for _ in range(config.epochs):
-        for j, (X, y) in enumerate(train_loader):
+        tk0 = tqdm.tqdm(train_loader, total=len(train_loader))
+        for j, (X, y) in enumerate(tk0):
 
             X = X.cuda()
             y = y.cuda()
