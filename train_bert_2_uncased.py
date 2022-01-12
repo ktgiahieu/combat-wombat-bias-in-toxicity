@@ -162,7 +162,7 @@ def train_bert(config: PipeLineConfig):
                 scheduler.step()
                 optimizer.zero_grad()
 
-    torch.save(model.state_dict(), f"./models/final-pipe2-{config.expname}.bin")
+    torch.save(model.state_dict(), f"/content/gdrive/MyDrive/Dataset/Jigsaw/unintend_model_save/final-pipe2-{config.expname}.bin")
 
 
 if __name__ == "__main__":
