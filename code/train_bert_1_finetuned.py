@@ -9,7 +9,11 @@ import torch
 from torch import nn
 from torch.utils import data
 
-from apex import amp
+try:
+    from apex import amp
+    APEX_AVAILABLE = True
+except:
+    APEX_AVAILABLE = False
 from torch.utils.tensorboard import SummaryWriter
 
 from transformers import BertForSequenceClassification, AdamW
@@ -120,7 +124,8 @@ def train_bert(config: PipeLineConfig):
         t_total=config.epochs * len(train_loader) // ACCUM_STEPS,
     )
 
-    model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
+    if APEX_AVAILABLE:
+        model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
     model = model.train()
 
     writer = SummaryWriter(logs_file)
@@ -139,8 +144,11 @@ def train_bert(config: PipeLineConfig):
             accuracy = ((y_pred[:, 0] > 0) == (y[:, 0] > 0.5)).float().mean()
             agg.log({"train_loss": loss.item(), "train_accuracy": accuracy.item()})
 
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+            if APEX_AVAILABLE:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
 
             if (j + 1) % ACCUM_STEPS == 0:
                 optimizer.step()
