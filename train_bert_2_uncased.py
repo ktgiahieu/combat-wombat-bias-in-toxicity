@@ -29,7 +29,7 @@ from toxic.metrics import IDENTITY_COLUMNS
 from toxic.bert import convert_line_uncased, PipeLineConfig, prepare_loss, AUX_TARGETS
 from toxic.utils import seed_everything
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 ACCUM_STEPS = 2
 
 
