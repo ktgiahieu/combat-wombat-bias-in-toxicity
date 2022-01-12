@@ -47,9 +47,10 @@ def train_bert(config: PipeLineConfig):
 
     
     sequences = []
+    pbar = 
     with multiprocessing.Pool(processes=32) as pool:
         text_list = train.comment_text.tolist()
-        for x in tqdm.tqdm(pool.map(convert_line_uncased, text_list), total=len(tasks)):
+        for x in tqdm.tqdm(pool.map(convert_line_uncased, text_list), total=len(text_list)):
             sequences.append(x)
 
     logging.info("Building ttensors for training...")
