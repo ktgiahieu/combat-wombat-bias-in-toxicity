@@ -46,6 +46,7 @@ def train_bert(config: PipeLineConfig):
     logging.info("Tokenizing...")
 
     sequences = []
+    text_list = train.comment_text.tolist()
     pbar = tqdm.tqdm(text_list, len(text_list))
     for t in pbar:
         sequences.append(convert_line_uncased(t))
