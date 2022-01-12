@@ -17,6 +17,7 @@ except:
 from torch.utils.tensorboard import SummaryWriter
 
 from transformers import BertForSequenceClassification, AdamW
+import transformers
 
 from toxic.utils import (
     perfect_bias,
@@ -120,9 +121,12 @@ def train_bert(config: PipeLineConfig):
     optimizer = AdamW(
         optimizer_grouped_parameters,
         lr=config.lr,
-        warmup=config.warmup,
-        t_total=config.epochs * len(train_loader) // ACCUM_STEPS,
     )
+    num_train_steps = config.epochs * len(train_loader) // ACCUM_STEPS
+    scheduler = transformers.get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=int(num_train_steps * config.warmup),
+        num_training_steps=num_train_steps)
 
     if APEX_AVAILABLE:
         model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
@@ -152,6 +156,7 @@ def train_bert(config: PipeLineConfig):
 
             if (j + 1) % ACCUM_STEPS == 0:
                 optimizer.step()
+                scheduler.step()
                 optimizer.zero_grad()
 
     torch.save(model.state_dict(), f"./models/final-pipe2-{config.expname}.bin")
