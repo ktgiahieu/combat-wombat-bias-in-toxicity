@@ -48,7 +48,7 @@ def train_bert(config: PipeLineConfig):
     sequences = []
     text_list = train.comment_text.tolist()
     pbar = tqdm.tqdm(text_list, len(text_list))
-    for t in pbar:
+    for t in text_list:
         sequences.append(convert_line_uncased(t))
     #with multiprocessing.Pool(processes=32) as pool:
     #    text_list = train.comment_text.tolist()
