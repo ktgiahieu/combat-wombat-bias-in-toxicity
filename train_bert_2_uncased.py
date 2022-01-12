@@ -45,9 +45,13 @@ def train_bert(config: PipeLineConfig):
 
     logging.info("Tokenizing...")
 
+    pbar = tqdm.tqdm(total=len(text_list))
+    def do_work(x):
+        convert_line_uncased(x)
+        pbar.update(1)
     with multiprocessing.Pool(processes=32) as pool:
         text_list = train.comment_text.tolist()
-        sequences = pool.map(convert_line_uncased, text_list)
+        sequences = pool.map(do_work, text_list)
 
     logging.info("Building ttensors for training...")
     sequences = np.array(sequences)

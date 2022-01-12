@@ -5,14 +5,21 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 
+import tqdm
+
 import torch
 from torch import nn
 from torch.utils import data
 
-from apex import amp
-from tensorboardX import SummaryWriter
+try:
+    from apex import amp
+    APEX_AVAILABLE = True
+except:
+    APEX_AVAILABLE = False
+from torch.utils.tensorboard import SummaryWriter
 
-from pytorch_pretrained_bert import BertForSequenceClassification, BertAdam
+from transformers import BertForSequenceClassification, AdamW
+import transformers
 
 from toxic.utils import (
     perfect_bias,
@@ -21,10 +28,10 @@ from toxic.utils import (
     should_decay,
 )
 from toxic.metrics import IDENTITY_COLUMNS
-from toxic.bert import convert_line_uncased, PipeLineConfig, AUX_TARGETS
+from toxic.bert import convert_line_uncased, PipeLineConfig, prepare_loss, AUX_TARGETS
 from toxic.utils import seed_everything
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 ACCUM_STEPS = 2
 
 
@@ -34,12 +41,13 @@ def train_bert(config: PipeLineConfig):
     logging.info("Reading data...")
     input_folder = "../input/jigsaw-unintended-bias-in-toxicity-classification/"
     train = pd.read_csv(os.path.join(input_folder, "train.csv"))
+    print(f"Dataset size: {len(train)}")
 
     logging.info("Tokenizing...")
 
     with multiprocessing.Pool(processes=32) as pool:
         text_list = train.comment_text.tolist()
-        sequences = pool.map(convert_line_cased, text_list)
+        sequences = pool.map(convert_line_uncased, text_list)
 
     logging.info("Building ttensors for training...")
     sequences = np.array(sequences)
@@ -86,7 +94,6 @@ def train_bert(config: PipeLineConfig):
     seed_everything(config.seed)
 
     logging.info("Creating dataset...")
-
     dataset = data.TensorDataset(
         torch.from_numpy(sequences).long(), y_train_torch, torch.from_numpy(lengths)
     )
@@ -114,14 +121,18 @@ def train_bert(config: PipeLineConfig):
         },
     ]
 
-    optimizer = BertAdam(
+    optimizer = AdamW(
         optimizer_grouped_parameters,
         lr=config.lr,
-        warmup=config.warmup,
-        t_total=config.epochs * len(train_loader) // ACCUM_STEPS,
     )
+    num_train_steps = config.epochs * len(train_loader) // ACCUM_STEPS
+    scheduler = transformers.get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=int(num_train_steps * config.warmup),
+        num_training_steps=num_train_steps)
 
-    model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
+    if APEX_AVAILABLE:
+        model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
     model = model.train()
 
     writer = SummaryWriter(logs_file)
@@ -129,25 +140,31 @@ def train_bert(config: PipeLineConfig):
     custom_loss = prepare_loss(config)
 
     for _ in range(config.epochs):
-        for j, (X, y) in enumerate(train_loader):
+        tk0 = tqdm.tqdm(train_loader, total=len(train_loader))
+        for j, (X, y) in enumerate(tk0):
 
             X = X.cuda()
             y = y.cuda()
 
-            y_pred = model(X, attention_mask=(X > 0))
+            y_pred = model(X, attention_mask=(X > 0)).logits
             loss = custom_loss(y_pred, y)
 
             accuracy = ((y_pred[:, 0] > 0) == (y[:, 0] > 0.5)).float().mean()
             agg.log({"train_loss": loss.item(), "train_accuracy": accuracy.item()})
 
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+            if APEX_AVAILABLE:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
 
             if (j + 1) % ACCUM_STEPS == 0:
                 optimizer.step()
+                scheduler.step()
                 optimizer.zero_grad()
 
-    torch.save(model.state_dict(), f"./models/final-pipe3-{config.expname}.bin")
+    torch.save(model.state_dict(), f"/content/gdrive/MyDrive/Dataset/Jigsaw/unintend_model_save/final-pipe3-{config.expname}.bin")
+
 
 
 if __name__ == "__main__":
@@ -207,5 +224,6 @@ if __name__ == "__main__":
         main_loss_weight=1.2,
     )
 
-    for config in (config_1, config_2, config_3, config_4, config_5, config_6):
+    for ci, config in enumerate((config_1, config_2, config_3, config_4, config_5, config_6)):
+        print(f'Training config {ci+1}')
         train_bert(config)

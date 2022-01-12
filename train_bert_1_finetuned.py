@@ -5,6 +5,8 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 
+import tqdm
+
 import torch
 from torch import nn
 from torch.utils import data
@@ -17,6 +19,7 @@ except:
 from torch.utils.tensorboard import SummaryWriter
 
 from transformers import BertForSequenceClassification, AdamW
+import transformers
 
 from toxic.utils import (
     perfect_bias,
@@ -28,7 +31,7 @@ from toxic.metrics import IDENTITY_COLUMNS
 from toxic.bert import convert_line_uncased, PipeLineConfig, prepare_loss, AUX_TARGETS
 from toxic.utils import seed_everything
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 ACCUM_STEPS = 2
 
 
@@ -37,7 +40,8 @@ def train_bert(config: PipeLineConfig):
 
     logging.info("Reading data...")
     input_folder = "../input/jigsaw-unintended-bias-in-toxicity-classification/"
-    train = pd.read_csv(os.path.join(input_folder, "train.csv"))[:1000]
+    train = pd.read_csv(os.path.join(input_folder, "train.csv"))
+    print(f"Dataset size: {len(train)}")
 
     logging.info("Tokenizing...")
 
@@ -90,7 +94,6 @@ def train_bert(config: PipeLineConfig):
     seed_everything(config.seed)
 
     logging.info("Creating dataset...")
-
     dataset = data.TensorDataset(
         torch.from_numpy(sequences).long(), y_train_torch, torch.from_numpy(lengths)
     )
@@ -99,13 +102,14 @@ def train_bert(config: PipeLineConfig):
     )
 
     logging.info("Creating a model...")
-    model = BertForSequenceClassification.from_pretrained("bert-ft/", num_labels=18)
+    model = BertForSequenceClassification.from_pretrained(
+        "bert-tf/", num_labels=18
+    )
     model.zero_grad()
     model = model.cuda()
     model.classifier.bias = nn.Parameter(perfect_bias(perfect_output.mean(0)).cuda())
 
     logs_file = f"./tb_logs/final_{config.expname}"
-
     optimizer_grouped_parameters = [
         {
             "params": [p for n, p in model.named_parameters() if should_decay(n)],
@@ -120,9 +124,12 @@ def train_bert(config: PipeLineConfig):
     optimizer = AdamW(
         optimizer_grouped_parameters,
         lr=config.lr,
-        warmup=config.warmup,
-        t_total=config.epochs * len(train_loader) // ACCUM_STEPS,
     )
+    num_train_steps = config.epochs * len(train_loader) // ACCUM_STEPS
+    scheduler = transformers.get_linear_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=int(num_train_steps * config.warmup),
+        num_training_steps=num_train_steps)
 
     if APEX_AVAILABLE:
         model, optimizer = amp.initialize(model, optimizer, opt_level="O1", verbosity=0)
@@ -133,12 +140,13 @@ def train_bert(config: PipeLineConfig):
     custom_loss = prepare_loss(config)
 
     for _ in range(config.epochs):
-        for j, (X, y) in enumerate(train_loader):
+        tk0 = tqdm.tqdm(train_loader, total=len(train_loader))
+        for j, (X, y) in enumerate(tk0):
 
             X = X.cuda()
             y = y.cuda()
 
-            y_pred = model(X, attention_mask=(X > 0))
+            y_pred = model(X, attention_mask=(X > 0)).logits
             loss = custom_loss(y_pred, y)
 
             accuracy = ((y_pred[:, 0] > 0) == (y[:, 0] > 0.5)).float().mean()
@@ -152,9 +160,10 @@ def train_bert(config: PipeLineConfig):
 
             if (j + 1) % ACCUM_STEPS == 0:
                 optimizer.step()
+                scheduler.step()
                 optimizer.zero_grad()
 
-    torch.save(model.state_dict(), f"./models/final-pipe1-{config.expname}.bin")
+    torch.save(model.state_dict(), f"/content/gdrive/MyDrive/Dataset/Jigsaw/unintend_model_save/final-pipe1-{config.expname}.bin")
 
 
 if __name__ == "__main__":
@@ -213,5 +222,6 @@ if __name__ == "__main__":
         main_loss_weight=1.0,
     )
 
-    for config in (config_1, config_2, config_3, config_4, config_5, config_6):
+    for ci, config in enumerate((config_1, config_2, config_3, config_4, config_5, config_6)):
+        print(f'Training config {ci+1}')
         train_bert(config)
