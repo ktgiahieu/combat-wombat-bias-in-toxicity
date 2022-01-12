@@ -26,7 +26,7 @@ from toxic.utils import (
     should_decay,
 )
 from toxic.metrics import IDENTITY_COLUMNS
-from toxic.bert import convert_line_uncased, PipeLineConfig, AUX_TARGETS
+from toxic.bert import convert_line_uncased, PipeLineConfig, prepare_loss, AUX_TARGETS
 from toxic.utils import seed_everything
 
 BATCH_SIZE = 64
