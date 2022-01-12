@@ -142,7 +142,7 @@ def train_bert(config: PipeLineConfig):
             X = X.cuda()
             y = y.cuda()
 
-            y_pred = model(X, attention_mask=(X > 0))
+            y_pred = model(X, attention_mask=(X > 0)).logits
             loss = custom_loss(y_pred, y)
 
             accuracy = ((y_pred[:, 0] > 0) == (y[:, 0] > 0.5)).float().mean()
